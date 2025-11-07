@@ -11,20 +11,7 @@
     <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
     <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
     
-    <!-- 3. Firebase SDKs (NEW) -->
-    <!-- We will use the Firebase services provided by the environment -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, collection, setDoc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        
-        // Make functions available globally
-        window.firebase = {
-            initializeApp,
-            getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
-            getFirestore, doc, onSnapshot, collection, setDoc, deleteDoc, setLogLevel
-        };
-    </script>
+    <!-- 3. Firebase SDKs (REMOVED) -->
 
     <style>
         /* Custom styles */
@@ -50,16 +37,7 @@
         .status-no-response { background-color: #4a5568; color: #f7fafc; }
         .status-unknown { background-color: #edf2f7; color: #a0aec0; }
         
-        /* NEW Lock Style */
-        .row-locked {
-            background-color: #fffbeb !important; /* Light yellow */
-            opacity: 0.8;
-        }
-        .row-locked .edit-btn {
-            color: #b45309; /* Dark yellow */
-            cursor: not-allowed;
-            text-decoration: line-through;
-        }
+        /* Lock Style (REMOVED) */
 
     </style>
 </head>
@@ -104,7 +82,7 @@
         <header class="mb-8">
             <h1 class="text-4xl font-bold text-gray-900">Order Management Dashboard</h1>
             <p class="text-lg text-gray-600 mt-1">Live data from your Google Sheet</p>
-            <p class="text-sm text-gray-500 mt-2">Your User ID (for locking): <span id="user-id-display" class="font-mono"></span></p>
+            <!-- User ID Display REMOVED -->
         </header>
 
         <!-- Status Overview -->
@@ -142,14 +120,14 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lock Status</th>
+                                <!-- Lock Status th REMOVED -->
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
                             </tr>
                         </thead>
                         <tbody id="orders-table-body" class="bg-white divide-y divide-gray-200">
                             <!-- Rows will be injected by JS -->
                             <tr>
-                                <td colspan="6" class="px-6 py-4 text-center text-gray-500">Loading orders...</td>
+                                <td colspan="5" class="px-6 py-4 text-center text-gray-500">Loading orders...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -229,7 +207,7 @@
         let tokenClient;
         let gapiInited = false;
         let gisInited = false;
-        let firebaseReady = false;
+        // let firebaseReady = false; // REMOVED
 
         // --- Config & DOM Elements ---
         let config = {
@@ -238,13 +216,8 @@
             spreadsheetId: '1ipmC-pPp17L-KdhQ7P_-XJjN_V1TQLC7XX_1bhWn1rg',
             range: 'Gadgets!A2:R' // Fetch columns A through R
         };
-
-        // --- Firebase Config (NEW) ---
-        let db, auth;
-        let appId, userId;
-        let lockCollectionPath;
-        let currentLocks = {}; // Real-time state of locks
-        let lockListenerUnsubscribe = null; // To stop listener
+        
+        // --- Firebase Config (REMOVED) ---
 
         // --- DOM Elements ---
         const loginScreen = document.getElementById('login-screen');
@@ -254,7 +227,7 @@
         const errorMessage = document.getElementById('error-message');
         const closeErrorButton = document.getElementById('close-error');
         const appContainer = document.getElementById('app-container');
-        const userIdDisplay = document.getElementById('user-id-display');
+        // const userIdDisplay = document.getElementById('user-id-display'); // REMOVED
         const refreshButton = document.getElementById('refresh-button');
         const showAllButton = document.getElementById('show-all-button');
         const ordersListTitle = document.getElementById('orders-list-title');
@@ -288,55 +261,7 @@
 
         // --- App Initialization ---
         
-        // 1. Firebase (NEW)
-        async function initFirebase() {
-            // Get Firebase config from environment
-            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-            if (!firebaseConfig.apiKey) {
-                showError("Firebase config is missing. Real-time features will fail.");
-                console.error("Firebase config is missing.");
-                return;
-            }
-
-            try {
-                // De-structure global functions
-                const { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, setLogLevel } = window.firebase;
-
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                setLogLevel('Debug');
-
-                // Set up auth
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        userIdDisplay.textContent = userId;
-                        lockCollectionPath = `/artifacts/${appId}/public/data/order_locks`;
-                        console.log("Firebase Auth ready. User:", userId);
-                        
-                        firebaseReady = true;
-                        checkReady(); // Check if all services are ready
-                        
-                        // Start listening for locks AFTER auth is ready
-                        startLockListener();
-                    }
-                });
-
-                // Sign in
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                
-            } catch (err) {
-                console.error("Firebase Init Error:", err);
-                showError(`Firebase Init Error: ${err.message}`);
-            }
-        }
+        // 1. Firebase (REMOVED)
         
         // 2. Google API
         window.gapiLoaded = () => {
@@ -362,15 +287,15 @@
             checkReady();
         }
         
-        // 3. Check when all services are ready (Firebase + Google)
+        // 3. Check when all services are ready
         function checkReady() {
-            // Wait for GAPI, GIS, and Firebase
-            if (gapiInited && gisInited && firebaseReady) {
+            // Wait for GAPI and GIS
+            if (gapiInited && gisInited) {
                 loginButton.disabled = false;
                 loginButton.classList.remove('bg-gray-400', 'cursor-not-allowed');
                 loginButton.classList.add('bg-blue-600', 'hover:bg-blue-700');
                 loginButton.querySelector('span').textContent = 'Sign In with Google';
-                console.log("All services ready.");
+                console.log("Google services ready.");
             }
         }
         
@@ -397,32 +322,7 @@
 
         // --- Data Loading & Processing ---
 
-        // NEW: Real-time lock listener
-        function startLockListener() {
-            if (lockListenerUnsubscribe) {
-                lockListenerUnsubscribe(); // Stop previous listener
-            }
-            const { collection, onSnapshot } = window.firebase;
-            
-            const q = collection(db, lockCollectionPath);
-            lockListenerUnsubscribe = onSnapshot(q, (querySnapshot) => {
-                const newLocks = {};
-                querySnapshot.forEach((doc) => {
-                    newLocks[doc.id] = doc.data(); // doc.id is the row index
-                });
-                
-                currentLocks = newLocks; // Update global lock state
-                console.log("Real-time locks updated:", currentLocks);
-                
-                // Re-render the table with new lock info
-                if (allOrdersData.length > 0) {
-                    renderTable();
-                }
-            }, (err) => {
-                console.error("Lock listener error:", err);
-                showError("Real-time connection failed. Please refresh.");
-            });
-        }
+        // Lock listener (REMOVED)
 
         async function loadData() {
             showLoader(true);
@@ -472,7 +372,7 @@
             });
         }
 
-        // Renders the table based on current state (allOrdersData, currentLocks, currentFilter)
+        // Renders the table based on current state
         function renderTable() {
             let ordersHtml = '';
             
@@ -483,33 +383,20 @@
 
             if (dataToRender.length === 0) {
                 const message = currentFilter ? "No orders match this filter." : "No data found in sheet.";
-                ordersHtml = `<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">${message}</td></tr>`;
+                ordersHtml = `<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">${message}</td></tr>`;
             } else {
                 dataToRender.forEach(item => {
                     const row = item.rowData;
                     const originalIndex = item.originalIndex; // This is the key
-                    
-                    // Check lock status
-                    const lock = currentLocks[originalIndex];
-                    const isLocked = !!lock;
-                    const isLockedByMe = isLocked && lock.lockedBy === userId;
-                    const rowClass = isLocked && !isLockedByMe ? 'row-locked' : '';
                     
                     const customer = row[CUSTOMER_COLUMN_INDEX] || 'N/A';
                     const phone = row[PHONE_COLUMN_INDEX] || 'N/A';
                     const address = row[ADDRESS_COLUMN_INDEX] || 'N/A';
                     const status = row[STATUS_COLUMN_INDEX] || 'Unknown';
 
-                    let lockHtml = '<span class="px-3 py-1 text-xs font-medium text-gray-500">Unlocked</span>';
-                    if (isLockedByMe) {
-                        lockHtml = '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-700">Locked by You</span>';
-                    } else if (isLocked) {
-                        lockHtml = `<span class="px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-700">Locked</span>`;
-                    }
-
                     // Create table row
                     ordersHtml += `
-                        <tr class="${rowClass} hover:bg-gray-50" data-row-index="${originalIndex}">
+                        <tr class="hover:bg-gray-50" data-row-index="${originalIndex}">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm font-medium text-gray-900">${customer}</div>
                             </td>
@@ -522,9 +409,7 @@
                             <td class="px-6 py-4 whitespace-nowrap">
                                 ${getStatusBadge(status)}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                ${lockHtml}
-                            </td>
+                            <!-- Lock Status td REMOVED -->
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <button class="edit-btn text-indigo-600 hover:text-indigo-900">Edit</button>
                             </td>
@@ -578,72 +463,32 @@
                     </span>`;
         }
 
-        // --- Editing & Locking Logic (NEW) ---
+        // --- Editing Logic (Simplified) ---
 
-        async function handleEditClick(event) {
+        function handleEditClick(event) {
             const rowIndex = event.target.closest('tr').getAttribute('data-row-index');
             
-            // Check if locked by someone else
-            const lock = currentLocks[rowIndex];
-            if (lock && lock.lockedBy !== userId) {
-                showError("This order is currently being edited by another user.");
-                return;
-            }
-
-            // Place lock
-            showLoader(true);
-            try {
-                const { doc, setDoc } = window.firebase;
-                const lockRef = doc(db, lockCollectionPath, rowIndex);
-                await setDoc(lockRef, { lockedBy: userId, lockedAt: new Date().toISOString() });
-                
-                // Lock acquired, now show modal
-                showLoader(false);
-                const itemData = allOrdersData[rowIndex];
-                if (!itemData) return;
-                
-                const rowData = itemData.rowData;
-                modalCustomer.textContent = rowData[CUSTOMER_COLUMN_INDEX] || 'N/A';
-                modalPhone.textContent = rowData[PHONE_COLUMN_INDEX] || 'N/A';
-                modalAddress.textContent = rowData[ADDRESS_COLUMN_INDEX] || 'N/A';
-                modalProduct.textContent = rowData[PRODUCT_COLUMN_INDEX] || 'N/A';
-                modalStatusSelect.value = rowData[STATUS_COLUMN_INDEX] || 'Pending';
-                modalRowIndex.value = rowIndex; // Store the original row index from the data array
-
-                showModal(true);
-
-            } catch (err) {
-                showLoader(false);
-                showError(`Could not acquire lock: ${err.message}`);
-                console.error("Locking error:", err);
-            }
-        }
-        
-        // NEW: Release lock
-        async function releaseLock(rowIndex) {
-            if (!rowIndex) return;
+            // Immediately show modal
+            const itemData = allOrdersData[rowIndex];
+            if (!itemData) return;
             
-            // Only release if I am the one who locked it
-            const lock = currentLocks[rowIndex];
-            if (lock && lock.lockedBy === userId) {
-                try {
-                    const { doc, deleteDoc } = window.firebase;
-                    const lockRef = doc(db, lockCollectionPath, rowIndex);
-                    await deleteDoc(lockRef);
-                    console.log("Lock released for row:", rowIndex);
-                } catch (err) {
-                    console.error("Failed to release lock:", err);
-                    // Don't show error, as it's not critical
-                }
-            }
-            modalRowIndex.value = ''; // Clear stored index
+            const rowData = itemData.rowData;
+            modalCustomer.textContent = rowData[CUSTOMER_COLUMN_INDEX] || 'N/A';
+            modalPhone.textContent = rowData[PHONE_COLUMN_INDEX] || 'N/A';
+            modalAddress.textContent = rowData[ADDRESS_COLUMN_INDEX] || 'N/A';
+            modalProduct.textContent = rowData[PRODUCT_COLUMN_INDEX] || 'N/A';
+            modalStatusSelect.value = rowData[STATUS_COLUMN_INDEX] || 'Pending';
+            modalRowIndex.value = rowIndex; // Store the original row index from the data array
+
+            showModal(true);
         }
         
-        // NEW: Handle modal close (save or cancel)
+        // Release lock (REMOVED)
+        
+        // Handle modal close (save or cancel)
         function handleModalClose(isSaving = false) {
-            const rowIndex = modalRowIndex.value;
             showModal(false);
-            releaseLock(rowIndex); // Always release lock on close
+            // releaseLock(rowIndex); // REMOVED
             
             if (isSaving) {
                 loadData(); // Reload all data to show changes
@@ -726,7 +571,7 @@
         closeErrorButton.addEventListener('click', hideError);
 
         // --- Start App ---
-        initFirebase(); // Start Firebase first
+        // initFirebase(); // REMOVED
         // Google API scripts will call their respective `...Loaded` functions when ready
 
     </script>
