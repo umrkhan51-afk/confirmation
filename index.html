@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Status Dashboard</title>
+    <!-- 1. Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 2. Google API Client & Identity Services -->
+    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+    <style>
+        /* Custom styles */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f7f6;
+        }
+        .dashboard-card {
+            transition: all 0.3s ease;
+        }
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        #loader-spinner {
+            border-top-color: #3498db;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        /* Status colors from your screenshot */
+        .status-confirm { background-color: #c9e5c6; color: #3a5a37; }
+        .status-cancelled { background-color: #f8d7da; color: #721c24; }
+        .status-pending { background-color: #fff3cd; color: #664d03; }
+        .status-delivered { background-color: #d1e7dd; color: #0f5132; }
+        .status-return { background-color: #e2e3e5; color: #41464b; }
+        .status-dispatched { background-color: #d6d8f5; color: #3e408a; }
+        .status-confirm-from-pendir { background-color: #c9e5c6; color: #3a5a37; }
+        .status-no-response { background-color: #584242; color: #fdfcfc; }
+        .status-need-to-call { background-color: #fef4cd; color: #665c03; }
+        .status-unknown { background-color: #f0f0f0; color: #333; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- New Login Screen -->
+    <div id="login-screen" class="fixed inset-0 bg-gray-900 flex items-center justify-center text-center z-20">
+        <div class="bg-white p-10 md:p-12 rounded-lg shadow-2xl max-w-md w-full mx-4">
+            <h1 class="text-4xl font-bold text-gray-800 mb-6">Swedzo Pakistan</h1>
+            <p class="text-gray-600 mb-8">Please sign in with Google to manage your orders.</p>
+            <button id="login-button" class="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-300 shadow-lg flex items-center justify-center space-x-3">
+                <!-- Google G Logo SVG -->
+                <svg class="w-6 h-6" viewBox="0 0 48 48">
+                    <path fill="#4285F4" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12s5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path>
+                    <path fill="#FBBC05" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path>
+                    <path fill="#E94235" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.962l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path>
+                    <path fill="#34A853" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571l6.19,5.238C39.927,34.551,44,29.63,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path>
+                </svg>
+                <span>Sign In with Google</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- App Container -->
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+
+        <!-- Header -->
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold text-gray-800">Order Management Dashboard</h1>
+            <p class="text-lg text-gray-600">Live data from your Google Sheet</p>
+        </header>
+
+        <!-- Configuration Section (REMOVED) -->
+        <!--
+        <div id="config-section" class="bg-white p-6 rounded-lg shadow-md mb-8">
+            ...
+        </div>
+        -->
+
+        <!-- Global Loader -->
+        <div id="loader" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div id="loader-spinner" class="w-16 h-16 border-8 border-gray-200 rounded-full"></div>
+        </div>
+
+        <!-- Global Error Box (Toast) -->
+        <div id="error-box" class="fixed bottom-4 right-4 z-50 hidden">
+            <div class="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg shadow-lg max-w-sm">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <strong class="font-bold">Error:</strong>
+                        <span id="error-message" class="block sm:inline">Something went wrong.</span>
+                    </div>
+                    <button id="close-error" class="ml-4 text-red-700 text-2xl font-bold">&times;</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main App Content (Hidden by default) -->
+        <div id="app-container" class="hidden">
+            
+            <!-- Dashboard Stats -->
+            <section id="dashboard-stats" class="mb-8">
+                <h2 class="text-2xl font-semibold mb-4 text-gray-700">Status Overview</h2>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    <!-- Cards will be injected by JS -->
+                </div>
+            </section>
+
+            <!-- Orders List -->
+            <section id="orders-list">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-semibold text-gray-700">All Orders</h2>
+                    <button id="refresh-button" class="bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-800 transition duration-300">
+                        &#x21bb; Refresh
+                    </button>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="orders-table-body" class="bg-white divide-y divide-gray-200">
+                                <!-- Rows will be injected by JS -->
+                                <tr>
+                                    <td colspan="4" class="px-6 py-4 text-center text-gray-500">Loading orders...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Edit Status Modal -->
+    <div id="edit-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-lg bg-white">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-2xl font-semibold text-gray-800">Edit Order Status</h3>
+                <button id="close-modal" class="text-gray-400 hover:text-gray-600 text-3xl">&times;</button>
+            </div>
+            
+            <!-- Modal Content -->
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Customer</label>
+                    <p id="modal-customer" class="mt-1 p-3 bg-gray-100 rounded-md text-gray-900"></p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Product</label>
+                    <p id="modal-product" class="mt-1 p-3 bg-gray-100 rounded-md text-gray-900"></p>
+                </div>
+                <div>
+                    <label for="modal-status-select" class="block text-sm font-medium text-gray-700">Status</label>
+                    <select id="modal-status-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        <!-- Options based on your screenshot -->
+                        <option>Confirm</option>
+                        <option>Cancelled</option>
+                        <option>Pending</option>
+                        <option>Delivered</option>
+                        <option>Return</option>
+                        <option>Dispatched</option>
+                        <option>Confirm From Pendir</option>
+                        <option>No Response</option>
+                        <option>Need to call</option>
+                    </select>
+                </div>
+                
+                <!-- Hidden field to store the row index -->
+                <input type="hidden" id="modal-row-index">
+
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button id="cancel-edit" class="bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition duration-300">Cancel</button>
+                    <button id="save-status" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition duration-300">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ================================== -->
+    <!-- JAVASCRIPT LOGIC -->
+    <!-- ================================== -->
+    <script>
+        const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
+        const DISCOVERY_DOC = 'https://sheets.googleapis.com/$discovery/rest?version=v4';
+
+        let tokenClient;
+        let gapiInited = false;
+        let gisInited = false;
+
+        // --- Config & DOM Elements ---
+        let config = {
+            apiKey: 'AIzaSyB02r6MUhOUuK_DscBqmkm0AcAG2ogwJ4k',
+            clientId: '205927545741-s36gk3l2drn9vp57b30gb04sn4qto4rh.apps.googleusercontent.com',
+            spreadsheetId: '1ipmC-pPp17L-KdhQ7P_-XJjN_V1TQLC7XX_1bhWn1rg',
+            range: 'Gadgets!A2:N' // Default range
+        };
+
+        const loginScreen = document.getElementById('login-screen');
+        const loginButton = document.getElementById('login-button');
+        const loader = document.getElementById('loader');
+        const errorBox = document.getElementById('error-box');
+        const errorMessage = document.getElementById('error-message');
+        const closeErrorButton = document.getElementById('close-error');
+        const appContainer = document.getElementById('app-container');
+        const refreshButton = document.getElementById('refresh-button');
+        const dashboardStats = document.getElementById('dashboard-stats').querySelector('div');
+        const ordersTableBody = document.getElementById('orders-table-body');
+        
+        // Modal elements
+        const editModal = document.getElementById('edit-modal');
+        const closeModalButton = document.getElementById('close-modal');
+        const cancelEditButton = document.getElementById('cancel-edit');
+        const saveStatusButton = document.getElementById('save-status');
+        const modalCustomer = document.getElementById('modal-customer');
+        const modalProduct = document.getElementById('modal-product');
+        const modalStatusSelect = document.getElementById('modal-status-select');
+        const modalRowIndex = document.getElementById('modal-row-index');
+
+        // Store all sheet data
+        let allOrdersData = [];
+
+        // Status column index (N is 13th column, 0-indexed)
+        const STATUS_COLUMN_INDEX = 13; 
+        // Other columns (C=2, D=3)
+        const PRODUCT_COLUMN_INDEX = 2;
+        const CUSTOMER_COLUMN_INDEX = 3;
+
+
+        // --- API Initialization ---
+
+        function gapiLoaded() {
+            gapi.load('client', initializeGapiClient);
+        }
+
+        async function initializeGapiClient() {
+            // Get keys from pre-filled inputs
+            config.apiKey = document.getElementById('api-key').value;
+            await gapi.client.init({
+                apiKey: config.apiKey,
+                discoveryDocs: [DISCOVERY_DOC],
+            });
+            gapiInited = true;
+        }
+
+        function gisLoaded() {
+            config.clientId = document.getElementById('client-id').value;
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: config.clientId,
+                scope: SCOPES,
+                callback: '', // Will be set dynamically
+            });
+            gisInited = true;
+        }
+        
+        // --- Authentication ---
+        
+        loginButton.onclick = () => {
+            // 1. Get range from input (in case user changed it)
+            // Note: Keys are hard-coded in 'config' object now
+            config.range = document.getElementById('range') ? document.getElementById('range').value : 'Gadgets!A2:N'; // Check if range input exists
+
+            if (!config.apiKey || !config.clientId || !config.spreadsheetId || !config.range) {
+                showError("Configuration keys are missing from the script.");
+                return;
+            }
+            
+            // Re-initialize clients just in case they failed on load
+            if (!gapiInited) initializeGapiClient();
+            if (!gisInited) gisLoaded();
+
+            // 2. Set callback for token client
+            tokenClient.callback = async (resp) => {
+                if (resp.error) {
+                    showError(resp.error.message || "An authentication error occurred.");
+                    return;
+                }
+                gapi.client.setToken(resp);
+                // Hide login, show app, load data
+                loginScreen.classList.add('hidden');
+                appContainer.classList.remove('hidden');
+                loadData();
+            };
+
+            // 3. Request token
+            if (gapi.client.getToken() === null) {
+                tokenClient.requestAccessToken({ prompt: 'consent' });
+            } else {
+                tokenClient.requestAccessToken({ prompt: '' });
+            }
+        };
+
+
+        // --- Data Loading & Processing ---
+
+        async function loadData() {
+            showLoader(true);
+            hideError();
+            try {
+                const response = await gapi.client.sheets.spreadsheets.values.get({
+                    spreadsheetId: config.spreadsheetId,
+                    range: config.range,
+                });
+                processData(response.result.values);
+            } catch (err) {
+                showError(err.result.error.message);
+                console.error(err);
+                // If auth fails, show config again
+                loginScreen.classList.remove('hidden');
+                appContainer.classList.add('hidden');
+            } finally {
+                showLoader(false);
+            }
+        }
+
+        function processData(values) {
+            if (!values || values.length === 0) {
+                ordersTableBody.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">No data found in sheet.</td></tr>';
+                return;
+            }
+
+            allOrdersData = values; // Store raw data
+            const statusCounts = {};
+            let ordersHtml = '';
+
+            values.forEach((row, index) => {
+                // Ensure row has data
+                if (row.length > STATUS_COLUMN_INDEX) {
+                    const customer = row[CUSTOMER_COLUMN_INDEX] || 'N/A';
+                    const product = row[PRODUCT_COLUMN_INDEX] || 'N/A';
+                    const status = row[STATUS_COLUMN_INDEX] || 'Unknown';
+                    
+                    // Increment status count
+                    statusCounts[status] = (statusCounts[status] || 0) + 1;
+
+                    // Create table row
+                    ordersHtml += `
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">${customer}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-700">${product}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                ${getStatusBadge(status)}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <button data-row-index="${index}" class="edit-btn text-indigo-600 hover:text-indigo-900">Edit</button>
+                            </td>
+                        </tr>
+                    `;
+                }
+            });
+
+            ordersTableBody.innerHTML = ordersHtml;
+            renderDashboard(statusCounts);
+            
+            // Add event listeners to new edit buttons
+            document.querySelectorAll('.edit-btn').forEach(button => {
+                button.addEventListener('click', handleEditClick);
+            });
+        }
+
+        function renderDashboard(counts) {
+            let dashboardHtml = '';
+            // Define colors for dashboard cards
+            const cardColors = {
+                'Pending': 'bg-yellow-100 border-yellow-300',
+                'Delivered': 'bg-green-100 border-green-300',
+                'Cancelled': 'bg-red-100 border-red-300',
+                'Dispatched': 'bg-blue-100 border-blue-300',
+                'Return': 'bg-gray-100 border-gray-300',
+                'Confirm': 'bg-teal-100 border-teal-300',
+                'No Response': 'bg-gray-700 border-gray-800 text-white',
+                'Need to call': 'bg-yellow-200 border-yellow-400',
+                'Confirm From Pendir': 'bg-teal-100 border-teal-300'
+            };
+
+            for (const [status, count] of Object.entries(counts)) {
+                const colors = cardColors[status] || 'bg-white border-gray-300';
+                dashboardHtml += `
+                    <div class="dashboard-card p-4 rounded-lg border-2 ${colors} shadow-sm">
+                        <div class="text-3xl font-bold ${colors.includes('text-white') ? 'text-white' : 'text-gray-900'}">${count}</div>
+                        <div class="text-sm font-medium ${colors.includes('text-white') ? 'text-gray-200' : 'text-gray-600'}">${status}</div>
+                    </div>
+                `;
+            }
+            dashboardStats.innerHTML = dashboardHtml;
+        }
+
+        function getStatusBadge(status) {
+            let statusClass = 'status-unknown';
+            if (status) {
+                statusClass = 'status-' + status.toLowerCase().replace(/ /g, '-');
+            }
+            return `<span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                        ${status || 'Unknown'}
+                    </span>`;
+        }
+
+        // --- Editing Logic ---
+
+        function handleEditClick(event) {
+            const rowIndex = event.target.getAttribute('data-row-index');
+            const rowData = allOrdersData[rowIndex];
+
+            if (!rowData) return;
+
+            modalCustomer.textContent = rowData[CUSTOMER_COLUMN_INDEX] || 'N/A';
+            modalProduct.textContent = rowData[PRODUCT_COLUMN_INDEX] || 'N/A';
+            modalStatusSelect.value = rowData[STATUS_COLUMN_INDEX] || 'Pending';
+            modalRowIndex.value = rowIndex; // Store the original row index from the data array
+
+            showModal(true);
+        }
+
+        async function handleSaveStatus() {
+            showLoader(true);
+            const originalDataRowIndex = parseInt(modalRowIndex.value);
+            // The sheet is 1-indexed, and we have a header row (A2), so add 2
+            const sheetRowNumber = originalDataRowIndex + 2; 
+            const newStatus = modalStatusSelect.value;
+            
+            // 'N' is the 14th letter.
+            const updateRange = `Gadgets!N${sheetRowNumber}`; 
+
+            try {
+                await gapi.client.sheets.spreadsheets.values.update({
+                    spreadsheetId: config.spreadsheetId,
+                    range: updateRange,
+                    valueInputOption: 'RAW',
+                    resource: {
+                        values: [[newStatus]]
+                    },
+                });
+                
+                // Success! Close modal and refresh data
+                showModal(false);
+                loadData(); // Reloads all data to show changes
+            } catch (err) {
+                showError(err.result.error.message);
+                console.error(err);
+            } finally {
+                showLoader(false);
+            }
+        }
+        
+
+        // --- UI Helpers ---
+
+        function showLoader(show) {
+            loader.classList.toggle('hidden', !show);
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorBox.classList.remove('hidden');
+        }
+
+        function hideError() {
+            errorBox.classList.add('hidden');
+        }
+        
+        function showModal(show) {
+            editModal.classList.toggle('hidden', !show);
+        }
+
+        // --- Event Listeners ---
+        refreshButton.addEventListener('click', loadData);
+        closeModalButton.addEventListener('click', () => showModal(false));
+        cancelEditButton.addEventListener('click', () => showModal(false));
+        saveStatusButton.addEventListener('click', handleSaveStatus);
+        closeErrorButton.addEventListener('click', hideError);
+
+    </script>
+</body>
+</html>
