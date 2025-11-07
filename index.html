@@ -242,8 +242,7 @@
         }
 
         async function initializeGapiClient() {
-            // Get keys from pre-filled inputs
-            config.apiKey = document.getElementById('api-key').value;
+            // Get keys directly from the config object
             await gapi.client.init({
                 apiKey: config.apiKey,
                 discoveryDocs: [DISCOVERY_DOC],
@@ -252,7 +251,7 @@
         }
 
         function gisLoaded() {
-            config.clientId = document.getElementById('client-id').value;
+            // Get keys directly from the config object
             tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: config.clientId,
                 scope: SCOPES,
@@ -264,10 +263,7 @@
         // --- Authentication ---
         
         loginButton.onclick = () => {
-            // 1. Get range from input (in case user changed it)
-            // Note: Keys are hard-coded in 'config' object now
-            config.range = document.getElementById('range') ? document.getElementById('range').value : 'Gadgets!A2:N'; // Check if range input exists
-
+            // Note: Keys and range are hard-coded in 'config' object now
             if (!config.apiKey || !config.clientId || !config.spreadsheetId || !config.range) {
                 showError("Configuration keys are missing from the script.");
                 return;
