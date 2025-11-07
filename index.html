@@ -6,9 +6,26 @@
     <title>Order Status Dashboard</title>
     <!-- 1. Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
     <!-- 2. Google API Client & Identity Services -->
     <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
     <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+    
+    <!-- 3. Firebase SDKs (NEW) -->
+    <!-- We will use the Firebase services provided by the environment -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, collection, setDoc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Make functions available globally
+        window.firebase = {
+            initializeApp,
+            getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
+            getFirestore, doc, onSnapshot, collection, setDoc, deleteDoc, setLogLevel
+        };
+    </script>
+
     <style>
         /* Custom styles */
         body {
@@ -19,33 +36,51 @@
             transition: all 0.3s ease;
         }
         .dashboard-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
         }
-        #loader-spinner {
-            border-top-color: #3498db;
-            animation: spin 1s linear infinite;
+        
+        /* Status Badge Colors */
+        .status-confirm, .status-confirm-from-pendir { background-color: #e6fffa; color: #38b2ac; }
+        .status-cancelled { background-color: #fff5f5; color: #e53e3e; }
+        .status-pending, .status-need-to-call { background-color: #fffaf0; color: #dd6b20; }
+        .status-delivered { background-color: #f0fff4; color: #38a169; }
+        .status-return { background-color: #fafafa; color: #718096; }
+        .status-dispatched { background-color: #ebf8ff; color: #4299e1; }
+        .status-no-response { background-color: #4a5568; color: #f7fafc; }
+        .status-unknown { background-color: #edf2f7; color: #a0aec0; }
+        
+        /* NEW Lock Style */
+        .row-locked {
+            background-color: #fffbeb !important; /* Light yellow */
+            opacity: 0.8;
         }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        .row-locked .edit-btn {
+            color: #b45309; /* Dark yellow */
+            cursor: not-allowed;
+            text-decoration: line-through;
         }
-        /* Status colors from your screenshot */
-        .status-confirm { background-color: #c9e5c6; color: #3a5a37; }
-        .status-cancelled { background-color: #f8d7da; color: #721c24; }
-        .status-pending { background-color: #fff3cd; color: #664d03; }
-        .status-delivered { background-color: #d1e7dd; color: #0f5132; }
-        .status-return { background-color: #e2e3e5; color: #41464b; }
-        .status-dispatched { background-color: #d6d8f5; color: #3e408a; }
-        .status-confirm-from-pendir { background-color: #c9e5c6; color: #3a5a37; }
-        .status-no-response { background-color: #584242; color: #fdfcfc; }
-        .status-need-to-call { background-color: #fef4cd; color: #665c03; }
-        .status-unknown { background-color: #f0f0f0; color: #333; }
+
     </style>
 </head>
-<body class="antialiased">
+<body class="antialiased text-gray-800">
 
-    <!-- New Login Screen -->
-    <div id="login-screen" class="fixed inset-0 bg-gray-900 flex items-center justify-center text-center z-20">
+    <!-- Global Loader -->
+    <div id="loader" class="fixed inset-0 bg-white bg-opacity-75 z-[100] flex items-center justify-center hidden backdrop-blur-sm">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600"></div>
+    </div>
+
+    <!-- Global Error Box -->
+    <div id="error-box" class="fixed top-5 right-5 w-full max-w-sm bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg hidden z-[101]" role="alert">
+        <strong class="font-bold">Error:</strong>
+        <span id="error-message" class="block sm:inline">Something went wrong.</span>
+        <span id="close-error" class="absolute top-0 bottom-0 right-0 px-4 py-3 cursor-pointer">
+            <svg class="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+        </span>
+    </div>
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="min-h-screen flex items-center justify-center" style="background-color: #0b1120;">
         <div class="bg-white p-10 md:p-12 rounded-lg shadow-2xl max-w-md w-full mx-4">
             <h1 class="text-4xl font-bold text-gray-800 mb-6">Swedzo Pakistan</h1>
             <p class="text-gray-600 mb-8">Please sign in with Google to manage your orders.</p>
@@ -54,94 +89,78 @@
                 <svg class="w-6 h-6" viewBox="0 0 48 48">
                     <path fill="#4285F4" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12s5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path>
                     <path fill="#FBBC05" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path>
-                    <path fill="#E94235" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.962l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path>
+                    <path fill="#E84335" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path>
                     <path fill="#34A853" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571l6.19,5.238C39.927,34.551,44,29.63,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path>
                 </svg>
                 <span>Loading Libraries...</span>
             </button>
         </div>
     </div>
-
-    <!-- App Container -->
-    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
-
+    
+    <!-- Main App Container -->
+    <div id="app-container" class="p-4 md:p-8 max-w-7xl mx-auto hidden">
+        
         <!-- Header -->
         <header class="mb-8">
-            <h1 class="text-4xl font-bold text-gray-800">Order Management Dashboard</h1>
-            <p class="text-lg text-gray-600">Live data from your Google Sheet</p>
+            <h1 class="text-4xl font-bold text-gray-900">Order Management Dashboard</h1>
+            <p class="text-lg text-gray-600 mt-1">Live data from your Google Sheet</p>
+            <p class="text-sm text-gray-500 mt-2">Your User ID (for locking): <span id="user-id-display" class="font-mono"></span></p>
         </header>
 
-        <!-- Configuration Section (REMOVED) -->
-        <!--
-        <div id="config-section" class="bg-white p-6 rounded-lg shadow-md mb-8">
-            ...
-        </div>
-        -->
-
-        <!-- Global Loader -->
-        <div id="loader" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 hidden">
-            <div id="loader-spinner" class="w-16 h-16 border-8 border-gray-200 rounded-full"></div>
-        </div>
-
-        <!-- Global Error Box (Toast) -->
-        <div id="error-box" class="fixed bottom-4 right-4 z-50 hidden">
-            <div class="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg shadow-lg max-w-sm">
-                <div class="flex justify-between items-center">
-                    <div>
-                        <strong class="font-bold">Error:</strong>
-                        <span id="error-message" class="block sm:inline">Something went wrong.</span>
-                    </div>
-                    <button id="close-error" class="ml-4 text-red-700 text-2xl font-bold">&times;</button>
-                </div>
+        <!-- Status Overview -->
+        <section id="dashboard-stats" class="mb-8">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Status Overview</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <!-- Cards will be injected by JS -->
+                <div class="p-4 rounded-lg border-2 bg-gray-100 shadow-sm animate-pulse h-24"></div>
+                <div class="p-4 rounded-lg border-2 bg-gray-100 shadow-sm animate-pulse h-24"></div>
+                <div class="p-4 rounded-lg border-2 bg-gray-100 shadow-sm animate-pulse h-24"></div>
+                <div class="p-4 rounded-lg border-2 bg-gray-100 shadow-sm animate-pulse h-24"></div>
+                <div class="p-4 rounded-lg border-2 bg-gray-100 shadow-sm animate-pulse h-24"></div>
             </div>
-        </div>
+        </section>
 
-        <!-- Main App Content (Hidden by default) -->
-        <div id="app-container" class="hidden">
-            
-            <!-- Dashboard Stats -->
-            <section id="dashboard-stats" class="mb-8">
-                <h2 class="text-2xl font-semibold mb-4 text-gray-700">Status Overview</h2>
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                    <!-- Cards will be injected by JS -->
-                </div>
-            </section>
-
-            <!-- Orders List -->
-            <section id="orders-list">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-semibold text-gray-700">All Orders</h2>
+        <!-- Orders List -->
+        <section id="orders-list">
+            <div class="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-4">
+                <h2 id="orders-list-title" class="text-2xl font-semibold text-gray-700">All Orders</h2>
+                <div class="flex space-x-2">
+                    <button id="show-all-button" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-300 hidden">
+                        Show All
+                    </button>
                     <button id="refresh-button" class="bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-800 transition duration-300">
                         &#x21bb; Refresh
                     </button>
                 </div>
-                <div class="bg-white p-6 rounded-lg shadow-md">
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="orders-table-body" class="bg-white divide-y divide-gray-200">
-                                <!-- Rows will be injected by JS -->
-                                <tr>
-                                    <td colspan="4" class="px-6 py-4 text-center text-gray-500">Loading orders...</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lock Status</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orders-table-body" class="bg-white divide-y divide-gray-200">
+                            <!-- Rows will be injected by JS -->
+                            <tr>
+                                <td colspan="6" class="px-6 py-4 text-center text-gray-500">Loading orders...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
-            </section>
-        </div>
+            </div>
+        </section>
     </div>
 
     <!-- Edit Status Modal -->
     <div id="edit-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-lg bg-white">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-lg bg-white">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-2xl font-semibold text-gray-800">Edit Order Status</h3>
                 <button id="close-modal" class="text-gray-400 hover:text-gray-600 text-3xl">&times;</button>
@@ -149,14 +168,28 @@
             
             <!-- Modal Content -->
             <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Customer</label>
-                    <p id="modal-customer" class="mt-1 p-3 bg-gray-100 rounded-md text-gray-900"></p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Customer</label>
+                        <p id="modal-customer" class="mt-1 p-3 bg-gray-100 rounded-md text-gray-900"></p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Phone</label>
+                        <p id="modal-phone" class="mt-1 p-3 bg-gray-100 rounded-md text-gray-900"></p>
+                    </div>
                 </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Address</label>
+                    <p id="modal-address" class="mt-1 p-3 bg-gray-100 rounded-md text-gray-900"></p>
+                </div>
+                
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Product</label>
                     <p id="modal-product" class="mt-1 p-3 bg-gray-100 rounded-md text-gray-900"></p>
                 </div>
+
                 <div>
                     <label for="modal-status-select" class="block text-sm font-medium text-gray-700">Status</label>
                     <select id="modal-status-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
@@ -188,22 +221,32 @@
     <!-- ================================== -->
     <!-- JAVASCRIPT LOGIC -->
     <!-- ================================== -->
-    <script>
+    <script type="module">
+        // --- Google API Config ---
         const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
         const DISCOVERY_DOC = 'https://sheets.googleapis.com/$discovery/rest?version=v4';
 
         let tokenClient;
         let gapiInited = false;
         let gisInited = false;
+        let firebaseReady = false;
 
         // --- Config & DOM Elements ---
         let config = {
             apiKey: 'AIzaSyB02r6MUhOUuK_DscBqmkm0AcAG2ogwJ4k',
             clientId: '205927545741-s36gk3l2drn9vp57b30gb04sn4qto4rh.apps.googleusercontent.com',
             spreadsheetId: '1ipmC-pPp17L-KdhQ7P_-XJjN_V1TQLC7XX_1bhWn1rg',
-            range: 'Gadgets!A2:N' // Default range
+            range: 'Gadgets!A2:R' // Fetch columns A through R
         };
 
+        // --- Firebase Config (NEW) ---
+        let db, auth;
+        let appId, userId;
+        let lockCollectionPath;
+        let currentLocks = {}; // Real-time state of locks
+        let lockListenerUnsubscribe = null; // To stop listener
+
+        // --- DOM Elements ---
         const loginScreen = document.getElementById('login-screen');
         const loginButton = document.getElementById('login-button');
         const loader = document.getElementById('loader');
@@ -211,7 +254,10 @@
         const errorMessage = document.getElementById('error-message');
         const closeErrorButton = document.getElementById('close-error');
         const appContainer = document.getElementById('app-container');
+        const userIdDisplay = document.getElementById('user-id-display');
         const refreshButton = document.getElementById('refresh-button');
+        const showAllButton = document.getElementById('show-all-button');
+        const ordersListTitle = document.getElementById('orders-list-title');
         const dashboardStats = document.getElementById('dashboard-stats').querySelector('div');
         const ordersTableBody = document.getElementById('orders-table-body');
         
@@ -221,83 +267,126 @@
         const cancelEditButton = document.getElementById('cancel-edit');
         const saveStatusButton = document.getElementById('save-status');
         const modalCustomer = document.getElementById('modal-customer');
+        const modalPhone = document.getElementById('modal-phone'); // New
+        const modalAddress = document.getElementById('modal-address'); // New
         const modalProduct = document.getElementById('modal-product');
         const modalStatusSelect = document.getElementById('modal-status-select');
         const modalRowIndex = document.getElementById('modal-row-index');
 
         // Store all sheet data
         let allOrdersData = [];
+        let currentFilter = null; // Store the current filter status
 
         // Status column index (N is 13th column, 0-indexed)
         const STATUS_COLUMN_INDEX = 13; 
-        // Other columns (C=2, D=3)
+        // Other columns (C=2, D=3, E=4, F=5)
         const PRODUCT_COLUMN_INDEX = 2;
         const CUSTOMER_COLUMN_INDEX = 3;
+        const PHONE_COLUMN_INDEX = 4; // New
+        const ADDRESS_COLUMN_INDEX = 5; // New
 
 
-        // --- API Initialization ---
+        // --- App Initialization ---
+        
+        // 1. Firebase (NEW)
+        async function initFirebase() {
+            // Get Firebase config from environment
+            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-        function gapiLoaded() {
+            if (!firebaseConfig.apiKey) {
+                showError("Firebase config is missing. Real-time features will fail.");
+                console.error("Firebase config is missing.");
+                return;
+            }
+
+            try {
+                // De-structure global functions
+                const { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, setLogLevel } = window.firebase;
+
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setLogLevel('Debug');
+
+                // Set up auth
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        userIdDisplay.textContent = userId;
+                        lockCollectionPath = `/artifacts/${appId}/public/data/order_locks`;
+                        console.log("Firebase Auth ready. User:", userId);
+                        
+                        firebaseReady = true;
+                        checkReady(); // Check if all services are ready
+                        
+                        // Start listening for locks AFTER auth is ready
+                        startLockListener();
+                    }
+                });
+
+                // Sign in
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+            } catch (err) {
+                console.error("Firebase Init Error:", err);
+                showError(`Firebase Init Error: ${err.message}`);
+            }
+        }
+        
+        // 2. Google API
+        window.gapiLoaded = () => {
             gapi.load('client', initializeGapiClient);
         }
 
         async function initializeGapiClient() {
-            // Get keys directly from the config object
             await gapi.client.init({
                 apiKey: config.apiKey,
                 discoveryDocs: [DISCOVERY_DOC],
             });
             gapiInited = true;
-            checkReady(); // Notify that GAPI is ready
+            checkReady();
         }
 
-        function gisLoaded() {
-            // Get keys directly from the config object
+        window.gisLoaded = () => {
             tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: config.clientId,
                 scope: SCOPES,
                 callback: '', // Will be set dynamically
             });
             gisInited = true;
-            checkReady(); // Notify that GIS is ready
+            checkReady();
         }
         
-        // --- New function to check if both libraries are loaded ---
+        // 3. Check when all services are ready (Firebase + Google)
         function checkReady() {
-            if (gapiInited && gisInited) {
-                // Both libraries are loaded, enable the button
+            // Wait for GAPI, GIS, and Firebase
+            if (gapiInited && gisInited && firebaseReady) {
                 loginButton.disabled = false;
                 loginButton.classList.remove('bg-gray-400', 'cursor-not-allowed');
                 loginButton.classList.add('bg-blue-600', 'hover:bg-blue-700');
                 loginButton.querySelector('span').textContent = 'Sign In with Google';
+                console.log("All services ready.");
             }
         }
         
         // --- Authentication ---
-        
         loginButton.onclick = () => {
-            // Note: Keys and range are hard-coded in 'config' object now
-            if (!config.apiKey || !config.clientId || !config.spreadsheetId || !config.range) {
-                showError("Configuration keys are missing from the script.");
-                return;
-            }
-            
-            // Removed the faulty re-init checks here
-
-            // 2. Set callback for token client
             tokenClient.callback = async (resp) => {
                 if (resp.error) {
                     showError(resp.error.message || "An authentication error occurred.");
                     return;
                 }
                 gapi.client.setToken(resp);
-                // Hide login, show app, load data
                 loginScreen.classList.add('hidden');
                 appContainer.classList.remove('hidden');
-                loadData();
+                loadData(); // Load sheet data *after* sign-in
             };
 
-            // 3. Request token
             if (gapi.client.getToken() === null) {
                 tokenClient.requestAccessToken({ prompt: 'consent' });
             } else {
@@ -308,6 +397,33 @@
 
         // --- Data Loading & Processing ---
 
+        // NEW: Real-time lock listener
+        function startLockListener() {
+            if (lockListenerUnsubscribe) {
+                lockListenerUnsubscribe(); // Stop previous listener
+            }
+            const { collection, onSnapshot } = window.firebase;
+            
+            const q = collection(db, lockCollectionPath);
+            lockListenerUnsubscribe = onSnapshot(q, (querySnapshot) => {
+                const newLocks = {};
+                querySnapshot.forEach((doc) => {
+                    newLocks[doc.id] = doc.data(); // doc.id is the row index
+                });
+                
+                currentLocks = newLocks; // Update global lock state
+                console.log("Real-time locks updated:", currentLocks);
+                
+                // Re-render the table with new lock info
+                if (allOrdersData.length > 0) {
+                    renderTable();
+                }
+            }, (err) => {
+                console.error("Lock listener error:", err);
+                showError("Real-time connection failed. Please refresh.");
+            });
+        }
+
         async function loadData() {
             showLoader(true);
             hideError();
@@ -316,11 +432,21 @@
                     spreadsheetId: config.spreadsheetId,
                     range: config.range,
                 });
-                processData(response.result.values);
+                
+                // Store raw data WITH original index
+                allOrdersData = (response.result.values || []).map((row, index) => ({
+                    rowData: row,
+                    originalIndex: index // This is the 0-based index from the A2:R range
+                }));
+                
+                console.log("Sheet data loaded:", allOrdersData.length, "rows");
+
+                processDashboardStats();
+                renderTable(); // Initial render
+            
             } catch (err) {
                 showError(err.result.error.message);
                 console.error(err);
-                // If auth fails, show config again
                 loginScreen.classList.remove('hidden');
                 appContainer.classList.add('hidden');
             } finally {
@@ -328,49 +454,87 @@
             }
         }
 
-        function processData(values) {
-            if (!values || values.length === 0) {
-                ordersTableBody.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">No data found in sheet.</td></tr>';
-                return;
-            }
-
-            allOrdersData = values; // Store raw data
+        // Processes dashboard stats only
+        function processDashboardStats() {
             const statusCounts = {};
-            let ordersHtml = '';
-
-            values.forEach((row, index) => {
-                // Ensure row has data
+            allOrdersData.forEach(item => {
+                const row = item.rowData;
                 if (row.length > STATUS_COLUMN_INDEX) {
-                    const customer = row[CUSTOMER_COLUMN_INDEX] || 'N/A';
-                    const product = row[PRODUCT_COLUMN_INDEX] || 'N/A';
                     const status = row[STATUS_COLUMN_INDEX] || 'Unknown';
-                    
-                    // Increment status count
                     statusCounts[status] = (statusCounts[status] || 0) + 1;
+                }
+            });
+            renderDashboard(statusCounts);
+            
+            // Re-add event listeners to new filter cards
+            document.querySelectorAll('.filter-card').forEach(card => {
+                card.addEventListener('click', handleFilterClick);
+            });
+        }
+
+        // Renders the table based on current state (allOrdersData, currentLocks, currentFilter)
+        function renderTable() {
+            let ordersHtml = '';
+            
+            // Apply filter if one is active
+            const dataToRender = currentFilter 
+                ? allOrdersData.filter(item => (item.rowData[STATUS_COLUMN_INDEX] || 'Unknown') === currentFilter)
+                : allOrdersData;
+
+            if (dataToRender.length === 0) {
+                const message = currentFilter ? "No orders match this filter." : "No data found in sheet.";
+                ordersHtml = `<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">${message}</td></tr>`;
+            } else {
+                dataToRender.forEach(item => {
+                    const row = item.rowData;
+                    const originalIndex = item.originalIndex; // This is the key
+                    
+                    // Check lock status
+                    const lock = currentLocks[originalIndex];
+                    const isLocked = !!lock;
+                    const isLockedByMe = isLocked && lock.lockedBy === userId;
+                    const rowClass = isLocked && !isLockedByMe ? 'row-locked' : '';
+                    
+                    const customer = row[CUSTOMER_COLUMN_INDEX] || 'N/A';
+                    const phone = row[PHONE_COLUMN_INDEX] || 'N/A';
+                    const address = row[ADDRESS_COLUMN_INDEX] || 'N/A';
+                    const status = row[STATUS_COLUMN_INDEX] || 'Unknown';
+
+                    let lockHtml = '<span class="px-3 py-1 text-xs font-medium text-gray-500">Unlocked</span>';
+                    if (isLockedByMe) {
+                        lockHtml = '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-700">Locked by You</span>';
+                    } else if (isLocked) {
+                        lockHtml = `<span class="px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-700">Locked</span>`;
+                    }
 
                     // Create table row
                     ordersHtml += `
-                        <tr class="hover:bg-gray-50">
+                        <tr class="${rowClass} hover:bg-gray-50" data-row-index="${originalIndex}">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm font-medium text-gray-900">${customer}</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-700">${product}</div>
+                                <div class="text-sm text-gray-700">${phone}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap max-w-xs truncate">
+                                <div class="text-sm text-gray-700" title="${address}">${address}</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 ${getStatusBadge(status)}
                             </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                ${lockHtml}
+                            </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <button data-row-index="${index}" class="edit-btn text-indigo-600 hover:text-indigo-900">Edit</button>
+                                <button class="edit-btn text-indigo-600 hover:text-indigo-900">Edit</button>
                             </td>
                         </tr>
                     `;
-                }
-            });
+                });
+            }
 
             ordersTableBody.innerHTML = ordersHtml;
-            renderDashboard(statusCounts);
-            
+
             // Add event listeners to new edit buttons
             document.querySelectorAll('.edit-btn').forEach(button => {
                 button.addEventListener('click', handleEditClick);
@@ -395,7 +559,7 @@
             for (const [status, count] of Object.entries(counts)) {
                 const colors = cardColors[status] || 'bg-white border-gray-300';
                 dashboardHtml += `
-                    <div class="dashboard-card p-4 rounded-lg border-2 ${colors} shadow-sm">
+                    <div data-status="${status}" class="filter-card dashboard-card p-4 rounded-lg border-2 ${colors} shadow-sm cursor-pointer hover:opacity-80">
                         <div class="text-3xl font-bold ${colors.includes('text-white') ? 'text-white' : 'text-gray-900'}">${count}</div>
                         <div class="text-sm font-medium ${colors.includes('text-white') ? 'text-gray-200' : 'text-gray-600'}">${status}</div>
                     </div>
@@ -414,20 +578,76 @@
                     </span>`;
         }
 
-        // --- Editing Logic ---
+        // --- Editing & Locking Logic (NEW) ---
 
-        function handleEditClick(event) {
-            const rowIndex = event.target.getAttribute('data-row-index');
-            const rowData = allOrdersData[rowIndex];
+        async function handleEditClick(event) {
+            const rowIndex = event.target.closest('tr').getAttribute('data-row-index');
+            
+            // Check if locked by someone else
+            const lock = currentLocks[rowIndex];
+            if (lock && lock.lockedBy !== userId) {
+                showError("This order is currently being edited by another user.");
+                return;
+            }
 
-            if (!rowData) return;
+            // Place lock
+            showLoader(true);
+            try {
+                const { doc, setDoc } = window.firebase;
+                const lockRef = doc(db, lockCollectionPath, rowIndex);
+                await setDoc(lockRef, { lockedBy: userId, lockedAt: new Date().toISOString() });
+                
+                // Lock acquired, now show modal
+                showLoader(false);
+                const itemData = allOrdersData[rowIndex];
+                if (!itemData) return;
+                
+                const rowData = itemData.rowData;
+                modalCustomer.textContent = rowData[CUSTOMER_COLUMN_INDEX] || 'N/A';
+                modalPhone.textContent = rowData[PHONE_COLUMN_INDEX] || 'N/A';
+                modalAddress.textContent = rowData[ADDRESS_COLUMN_INDEX] || 'N/A';
+                modalProduct.textContent = rowData[PRODUCT_COLUMN_INDEX] || 'N/A';
+                modalStatusSelect.value = rowData[STATUS_COLUMN_INDEX] || 'Pending';
+                modalRowIndex.value = rowIndex; // Store the original row index from the data array
 
-            modalCustomer.textContent = rowData[CUSTOMER_COLUMN_INDEX] || 'N/A';
-            modalProduct.textContent = rowData[PRODUCT_COLUMN_INDEX] || 'N/A';
-            modalStatusSelect.value = rowData[STATUS_COLUMN_INDEX] || 'Pending';
-            modalRowIndex.value = rowIndex; // Store the original row index from the data array
+                showModal(true);
 
-            showModal(true);
+            } catch (err) {
+                showLoader(false);
+                showError(`Could not acquire lock: ${err.message}`);
+                console.error("Locking error:", err);
+            }
+        }
+        
+        // NEW: Release lock
+        async function releaseLock(rowIndex) {
+            if (!rowIndex) return;
+            
+            // Only release if I am the one who locked it
+            const lock = currentLocks[rowIndex];
+            if (lock && lock.lockedBy === userId) {
+                try {
+                    const { doc, deleteDoc } = window.firebase;
+                    const lockRef = doc(db, lockCollectionPath, rowIndex);
+                    await deleteDoc(lockRef);
+                    console.log("Lock released for row:", rowIndex);
+                } catch (err) {
+                    console.error("Failed to release lock:", err);
+                    // Don't show error, as it's not critical
+                }
+            }
+            modalRowIndex.value = ''; // Clear stored index
+        }
+        
+        // NEW: Handle modal close (save or cancel)
+        function handleModalClose(isSaving = false) {
+            const rowIndex = modalRowIndex.value;
+            showModal(false);
+            releaseLock(rowIndex); // Always release lock on close
+            
+            if (isSaving) {
+                loadData(); // Reload all data to show changes
+            }
         }
 
         async function handleSaveStatus() {
@@ -450,9 +670,9 @@
                     },
                 });
                 
-                // Success! Close modal and refresh data
-                showModal(false);
-                loadData(); // Reloads all data to show changes
+                // Success! Close modal (will release lock) and refresh data
+                handleModalClose(true); // Pass true to signal refresh
+                
             } catch (err) {
                 showError(err.result.error.message);
                 console.error(err);
@@ -461,32 +681,53 @@
             }
         }
         
+        // --- Filter Logic ---
+        function handleFilterClick(event) {
+            const status = event.currentTarget.getAttribute('data-status');
+            currentFilter = status; // Set global filter
+            
+            renderTable(); // Re-render table with new filter
+            
+            // Update UI
+            ordersListTitle.textContent = `Filtered Orders: ${status}`;
+            showAllButton.classList.remove('hidden');
+        }
+
+        function handleShowAll() {
+            currentFilter = null; // Clear global filter
+            renderTable(); // Re-render with all data
+
+            // Update UI
+            ordersListTitle.textContent = 'All Orders';
+            showAllButton.classList.add('hidden');
+        }
 
         // --- UI Helpers ---
-
         function showLoader(show) {
             loader.classList.toggle('hidden', !show);
         }
-
         function showError(message) {
             errorMessage.textContent = message;
             errorBox.classList.remove('hidden');
         }
-
         function hideError() {
             errorBox.classList.add('hidden');
         }
-        
         function showModal(show) {
             editModal.classList.toggle('hidden', !show);
         }
 
         // --- Event Listeners ---
         refreshButton.addEventListener('click', loadData);
-        closeModalButton.addEventListener('click', () => showModal(false));
-        cancelEditButton.addEventListener('click', () => showModal(false));
+        showAllButton.addEventListener('click', handleShowAll);
+        closeModalButton.addEventListener('click', () => handleModalClose(false));
+        cancelEditButton.addEventListener('click', () => handleModalClose(false));
         saveStatusButton.addEventListener('click', handleSaveStatus);
         closeErrorButton.addEventListener('click', hideError);
+
+        // --- Start App ---
+        initFirebase(); // Start Firebase first
+        // Google API scripts will call their respective `...Loaded` functions when ready
 
     </script>
 </body>
