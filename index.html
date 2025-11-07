@@ -11,7 +11,6 @@
     <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
     <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
     
-    <!-- 3. Firebase SDKs (REMOVED) -->
 
     <style>
         /* Custom styles */
@@ -21,23 +20,43 @@
         }
         .dashboard-card {
             transition: all 0.3s ease;
+            border-radius: 0.75rem; /* More rounded */
+            border-width: 1px;
+            font-weight: 500;
         }
         .dashboard-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
         }
         
-        /* Status Badge Colors */
-        .status-confirm, .status-confirm-from-pendir { background-color: #e6fffa; color: #38b2ac; }
-        .status-cancelled { background-color: #fff5f5; color: #e53e3e; }
-        .status-pending, .status-need-to-call { background-color: #fffaf0; color: #dd6b20; }
-        .status-delivered { background-color: #f0fff4; color: #38a169; }
-        .status-return { background-color: #fafafa; color: #718096; }
-        .status-dispatched { background-color: #ebf8ff; color: #4299e1; }
-        .status-no-response { background-color: #4a5568; color: #f7fafc; }
+        /* NEW Status Badge Colors */
+        .status-confirm, .status-confirm-from-pendir { background-color: #c6f6d5; color: #2f855a; } /* Green */
+        .status-cancelled { background-color: #fed7d7; color: #c53030; } /* Red */
+        .status-pending, .status-need-to-call { background-color: #fefcbf; color: #b7791f; } /* Yellow */
+        .status-delivered { background-color: #c6f6d5; color: #2f855a; } /* Green */
+        .status-return { background-color: #e2e8f0; color: #4a5568; } /* Gray */
+        .status-dispatched { background-color: #bee3f8; color: #2b6cb0; } /* Blue */
+        .status-no-response { background-color: #4a5568; color: #f7fafc; } /* Dark Gray */
         .status-unknown { background-color: #edf2f7; color: #a0aec0; }
         
-        /* Lock Style (REMOVED) */
+        /* NEW Dashboard Card Colors (from screenshot) */
+        .card-dispatched { background-color: #ebf8ff; border-color: #bee3f8; }
+        .card-cancelled { background-color: #fff5f5; border-color: #fed7d7; }
+        .card-return { background-color: #f7fafc; border-color: #e2e8f0; }
+        .card-delivered { background-color: #f0fff4; border-color: #c6f6d5; }
+        .card-no-response { background-color: #4a5568; border-color: #2d3748; color: white; }
+        .card-not-confirm { background-color: #f7fafc; border-color: #e2e8f0; }
+        .card-confirm { background-color: #e6fffa; border-color: #b2f5ea; }
+        .card-need-to-call { background-color: #fefcbf; border-color: #faf089; }
+        .card-pending { background-color: #fefcbf; border-color: #faf089; }
+        .card-unknown { background-color: #f7fafc; border-color: #e2e8f0; }
+        .card-default { background-color: #ffffff; border-color: #e2e8f0; }
+        
+        /* Modal Scroll */
+        .modal-body-scroll {
+            max-height: 40vh;
+            overflow-y: auto;
+        }
 
     </style>
 </head>
@@ -76,25 +95,25 @@
     </div>
     
     <!-- Main App Container -->
-    <div id="app-container" class="p-4 md:p-8 max-w-7xl mx-auto hidden">
+    <div id="app-container" class="p-4 md:p-8 max-w-full 2xl:max-w-screen-2xl mx-auto hidden">
         
         <!-- Header -->
         <header class="mb-8">
             <h1 class="text-4xl font-bold text-gray-900">Order Management Dashboard</h1>
             <p class="text-lg text-gray-600 mt-1">Live data from your Google Sheet</p>
-            <!-- User ID Display REMOVED -->
         </header>
 
         <!-- Status Overview -->
         <section id="dashboard-stats" class="mb-8">
             <h2 class="text-2xl font-semibold text-gray-700 mb-4">Status Overview</h2>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                 <!-- Cards will be injected by JS -->
-                <div class="p-4 rounded-lg border-2 bg-gray-100 shadow-sm animate-pulse h-24"></div>
-                <div class="p-4 rounded-lg border-2 bg-gray-100 shadow-sm animate-pulse h-24"></div>
-                <div class="p-4 rounded-lg border-2 bg-gray-100 shadow-sm animate-pulse h-24"></div>
-                <div class="p-4 rounded-lg border-2 bg-gray-100 shadow-sm animate-pulse h-24"></div>
-                <div class="p-4 rounded-lg border-2 bg-gray-100 shadow-sm animate-pulse h-24"></div>
+                <div class="p-4 rounded-lg border bg-gray-100 shadow-sm animate-pulse h-28"></div>
+                <div class="p-4 rounded-lg border bg-gray-100 shadow-sm animate-pulse h-28"></div>
+                <div class="p-4 rounded-lg border bg-gray-100 shadow-sm animate-pulse h-28"></div>
+                <div class="p-4 rounded-lg border bg-gray-100 shadow-sm animate-pulse h-28"></div>
+                <div class="p-4 rounded-lg border bg-gray-100 shadow-sm animate-pulse h-28"></div>
+                <div class="p-4 rounded-lg border bg-gray-100 shadow-sm animate-pulse h-28"></div>
             </div>
         </section>
 
@@ -119,15 +138,16 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <!-- Lock Status th REMOVED -->
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
                             </tr>
                         </thead>
                         <tbody id="orders-table-body" class="bg-white divide-y divide-gray-200">
                             <!-- Rows will be injected by JS -->
                             <tr>
-                                <td colspan="5" class="px-6 py-4 text-center text-gray-500">Loading orders...</td>
+                                <td colspan="7" class="px-6 py-4 text-center text-gray-500">Loading orders...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -136,52 +156,73 @@
         </section>
     </div>
 
-    <!-- Edit Status Modal -->
+    <!-- Edit Row Modal (Completely new structure) -->
     <div id="edit-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-lg bg-white">
+        <div class="relative top-10 mx-auto p-5 border w-full max-w-3xl shadow-lg rounded-lg bg-white">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-2xl font-semibold text-gray-800">Edit Order Status</h3>
+                <h3 class="text-2xl font-semibold text-gray-800">Edit Full Order</h3>
                 <button id="close-modal" class="text-gray-400 hover:text-gray-600 text-3xl">&times;</button>
             </div>
             
             <!-- Modal Content -->
             <div class="space-y-4">
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Key Fields -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Customer</label>
-                        <p id="modal-customer" class="mt-1 p-3 bg-gray-100 rounded-md text-gray-900"></p>
+                        <label class="block text-sm font-medium text-gray-700">Customer (D)</label>
+                        <input type="text" id="modal-col-D" class="mt-1 p-2 w-full border border-gray-300 rounded-md shadow-sm">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Phone</label>
-                        <p id="modal-phone" class="mt-1 p-3 bg-gray-100 rounded-md text-gray-900"></p>
+                        <label class="block text-sm font-medium text-gray-700">Phone (E)</label>
+                        <input type="text" id="modal-col-E" class="mt-1 p-2 w-full border border-gray-300 rounded-md shadow-sm">
+                    </div>
+                     <div>
+                        <label class="block text-sm font-medium text-gray-700">Product (C)</label>
+                        <input type="text" id="modal-col-C" class="mt-1 p-2 w-full border border-gray-300 rounded-md shadow-sm">
                     </div>
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Address</label>
-                    <p id="modal-address" class="mt-1 p-3 bg-gray-100 rounded-md text-gray-900"></p>
+                    <label class="block text-sm font-medium text-gray-700">Address (F)</label>
+                    <textarea id="modal-col-F" rows="2" class="mt-1 p-2 w-full border border-gray-300 rounded-md shadow-sm"></textarea>
                 </div>
                 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Product</label>
-                    <p id="modal-product" class="mt-1 p-3 bg-gray-100 rounded-md text-gray-900"></p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Price (B)</label>
+                        <input type="text" id="modal-col-B" class="mt-1 p-2 w-full border border-gray-300 rounded-md shadow-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Quantity (H)</label>
+                        <input type="text" id="modal-col-H" class="mt-1 p-2 w-full border border-gray-300 rounded-md shadow-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Status (N)</label>
+                        <select id="modal-col-N" class="mt-1 block w-full p-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                            <!-- Options based on your screenshot -->
+                            <option>Confirm</option>
+                            <option>Cancelled</option>
+                            <option>Pending</option>
+                            <option>Delivered</option>
+                            <option>Return</option>
+                            <option>Dispatched</option>
+                            <option>Confirm From Pendir</option>
+                            <option>No Response</option>
+                            <option>Need to call</option>
+                        </select>
+                    </div>
                 </div>
-
-                <div>
-                    <label for="modal-status-select" class="block text-sm font-medium text-gray-700">Status</label>
-                    <select id="modal-status-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                        <!-- Options based on your screenshot -->
-                        <option>Confirm</option>
-                        <option>Cancelled</option>
-                        <option>Pending</option>
-                        <option>Delivered</option>
-                        <option>Return</option>
-                        <option>Dispatched</option>
-                        <option>Confirm From Pendir</option>
-                        <option>No Response</option>
-                        <option>Need to call</option>
-                    </select>
+                
+                <!-- Other Fields (Scrollable) -->
+                <div class="border-t pt-4">
+                    <h4 class="text-lg font-medium text-gray-700 mb-2">Other Fields</h4>
+                    <div class="modal-body-scroll p-4 bg-gray-50 rounded-lg border">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <!-- All 18 columns will be generated here -->
+                            <div id="modal-other-fields"></div>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- Hidden field to store the row index -->
@@ -189,7 +230,7 @@
 
                 <div class="pt-4 flex justify-end space-x-3">
                     <button id="cancel-edit" class="bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition duration-300">Cancel</button>
-                    <button id="save-status" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition duration-300">Save Changes</button>
+                    <button id="save-changes-button" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition duration-300">Save Changes</button>
                 </div>
             </div>
         </div>
@@ -207,7 +248,6 @@
         let tokenClient;
         let gapiInited = false;
         let gisInited = false;
-        // let firebaseReady = false; // REMOVED
 
         // --- Config & DOM Elements ---
         let config = {
@@ -217,8 +257,6 @@
             range: 'Gadgets!A2:R' // Fetch columns A through R
         };
         
-        // --- Firebase Config (REMOVED) ---
-
         // --- DOM Elements ---
         const loginScreen = document.getElementById('login-screen');
         const loginButton = document.getElementById('login-button');
@@ -227,7 +265,6 @@
         const errorMessage = document.getElementById('error-message');
         const closeErrorButton = document.getElementById('close-error');
         const appContainer = document.getElementById('app-container');
-        // const userIdDisplay = document.getElementById('user-id-display'); // REMOVED
         const refreshButton = document.getElementById('refresh-button');
         const showAllButton = document.getElementById('show-all-button');
         const ordersListTitle = document.getElementById('orders-list-title');
@@ -238,32 +275,36 @@
         const editModal = document.getElementById('edit-modal');
         const closeModalButton = document.getElementById('close-modal');
         const cancelEditButton = document.getElementById('cancel-edit');
-        const saveStatusButton = document.getElementById('save-status');
-        const modalCustomer = document.getElementById('modal-customer');
-        const modalPhone = document.getElementById('modal-phone'); // New
-        const modalAddress = document.getElementById('modal-address'); // New
-        const modalProduct = document.getElementById('modal-product');
-        const modalStatusSelect = document.getElementById('modal-status-select');
+        const saveChangesButton = document.getElementById('save-changes-button'); // Renamed
         const modalRowIndex = document.getElementById('modal-row-index');
+        const modalOtherFields = document.getElementById('modal-other-fields');
 
         // Store all sheet data
         let allOrdersData = [];
         let currentFilter = null; // Store the current filter status
+        const TOTAL_COLUMNS = 18; // A-R
 
-        // Status column index (N is 13th column, 0-indexed)
-        const STATUS_COLUMN_INDEX = 13; 
-        // Other columns (C=2, D=3, E=4, F=5)
-        const PRODUCT_COLUMN_INDEX = 2;
-        const CUSTOMER_COLUMN_INDEX = 3;
-        const PHONE_COLUMN_INDEX = 4; // New
-        const ADDRESS_COLUMN_INDEX = 5; // New
+        // Column headers (assuming from your sheet)
+        // A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, I=8... N=13
+        const COLUMN_NAMES = [
+            'Orders (A)', 'Price (B)', 'Product (C)', 'Name (D)', 'Number (E)', 
+            'Address (F)', 'City (G)', 'Quantity (H)', 'Item (I)', 'Col (J)', 
+            'Col (K)', 'Col (L)', 'Col (M)', 'Status (N)', 'Col (O)', 
+            'Col (P)', 'Col (Q)', 'Col (R)'
+        ];
+        
+        // Key column indices
+        const PRICE_COL = 1;
+        const PRODUCT_COL = 2;
+        const CUSTOMER_COL = 3;
+        const PHONE_COL = 4;
+        const ADDRESS_COL = 5;
+        const QUANTITY_COL = 7;
+        const STATUS_COL = 13;
 
 
         // --- App Initialization ---
         
-        // 1. Firebase (REMOVED)
-        
-        // 2. Google API
         window.gapiLoaded = () => {
             gapi.load('client', initializeGapiClient);
         }
@@ -287,9 +328,7 @@
             checkReady();
         }
         
-        // 3. Check when all services are ready
         function checkReady() {
-            // Wait for GAPI and GIS
             if (gapiInited && gisInited) {
                 loginButton.disabled = false;
                 loginButton.classList.remove('bg-gray-400', 'cursor-not-allowed');
@@ -322,8 +361,6 @@
 
         // --- Data Loading & Processing ---
 
-        // Lock listener (REMOVED)
-
         async function loadData() {
             showLoader(true);
             hideError();
@@ -335,7 +372,8 @@
                 
                 // Store raw data WITH original index
                 allOrdersData = (response.result.values || []).map((row, index) => ({
-                    rowData: row,
+                    // Ensure row has all 18 columns, padding with empty strings
+                    rowData: Array.from({ length: TOTAL_COLUMNS }, (_, i) => row[i] || ''),
                     originalIndex: index // This is the 0-based index from the A2:R range
                 }));
                 
@@ -359,10 +397,8 @@
             const statusCounts = {};
             allOrdersData.forEach(item => {
                 const row = item.rowData;
-                if (row.length > STATUS_COLUMN_INDEX) {
-                    const status = row[STATUS_COLUMN_INDEX] || 'Unknown';
-                    statusCounts[status] = (statusCounts[status] || 0) + 1;
-                }
+                const status = row[STATUS_COL] || 'Unknown';
+                statusCounts[status] = (statusCounts[status] || 0) + 1;
             });
             renderDashboard(statusCounts);
             
@@ -376,23 +412,24 @@
         function renderTable() {
             let ordersHtml = '';
             
-            // Apply filter if one is active
             const dataToRender = currentFilter 
-                ? allOrdersData.filter(item => (item.rowData[STATUS_COLUMN_INDEX] || 'Unknown') === currentFilter)
+                ? allOrdersData.filter(item => (item.rowData[STATUS_COL] || 'Unknown') === currentFilter)
                 : allOrdersData;
 
             if (dataToRender.length === 0) {
                 const message = currentFilter ? "No orders match this filter." : "No data found in sheet.";
-                ordersHtml = `<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">${message}</td></tr>`;
+                ordersHtml = `<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">${message}</td></tr>`;
             } else {
                 dataToRender.forEach(item => {
                     const row = item.rowData;
                     const originalIndex = item.originalIndex; // This is the key
                     
-                    const customer = row[CUSTOMER_COLUMN_INDEX] || 'N/A';
-                    const phone = row[PHONE_COLUMN_INDEX] || 'N/A';
-                    const address = row[ADDRESS_COLUMN_INDEX] || 'N/A';
-                    const status = row[STATUS_COLUMN_INDEX] || 'Unknown';
+                    const customer = row[CUSTOMER_COL] || 'N/A';
+                    const phone = row[PHONE_COL] || 'N/A';
+                    const address = row[ADDRESS_COL] || 'N/A';
+                    const product = row[PRODUCT_COL] || 'N/A';
+                    const price = row[PRICE_COL] || 'N/A';
+                    const status = row[STATUS_COL] || 'Unknown';
 
                     // Create table row
                     ordersHtml += `
@@ -406,10 +443,15 @@
                             <td class="px-6 py-4 whitespace-nowrap max-w-xs truncate">
                                 <div class="text-sm text-gray-700" title="${address}">${address}</div>
                             </td>
+                            <td class="px-6 py-4 whitespace-nowrap max-w-xs truncate">
+                                <div class="text-sm text-gray-700" title="${product}">${product}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-700">${price}</div>
+                            </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 ${getStatusBadge(status)}
                             </td>
-                            <!-- Lock Status td REMOVED -->
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <button class="edit-btn text-indigo-600 hover:text-indigo-900">Edit</button>
                             </td>
@@ -428,25 +470,41 @@
 
         function renderDashboard(counts) {
             let dashboardHtml = '';
-            // Define colors for dashboard cards
+            // NEW Dashboard Card Colors (from screenshot)
             const cardColors = {
-                'Pending': 'bg-yellow-100 border-yellow-300',
-                'Delivered': 'bg-green-100 border-green-300',
-                'Cancelled': 'bg-red-100 border-red-300',
-                'Dispatched': 'bg-blue-100 border-blue-300',
-                'Return': 'bg-gray-100 border-gray-300',
-                'Confirm': 'bg-teal-100 border-teal-300',
-                'No Response': 'bg-gray-700 border-gray-800 text-white',
-                'Need to call': 'bg-yellow-200 border-yellow-400',
-                'Confirm From Pendir': 'bg-teal-100 border-teal-300'
+                'Dispatched': 'card-dispatched',
+                'Cancelled': 'card-cancelled',
+                'Return': 'card-return',
+                'Delivered': 'card-delivered',
+                'No Response': 'card-no-response',
+                'Not confirm': 'card-not-confirm',
+                'Confirm': 'card-confirm',
+                'Need to call': 'card-need-to-call',
+                'Pending': 'card-pending',
+                'Unknown': 'card-unknown',
+                // Add more mappings from your screenshots
             };
 
-            for (const [status, count] of Object.entries(counts)) {
-                const colors = cardColors[status] || 'bg-white border-gray-300';
+            // Create a sorted list of statuses
+            const sortedStatuses = Object.keys(counts).sort((a, b) => {
+                // You can add custom sorting logic here if needed
+                return a.localeCompare(b);
+            });
+
+            for (const status of sortedStatuses) {
+                const count = counts[status];
+                // Find a matching class or use default
+                const colorClass = Object.keys(cardColors).find(key => status.toLowerCase().includes(key.toLowerCase())) 
+                                   ? cardColors[Object.keys(cardColors).find(key => status.toLowerCase().includes(key.toLowerCase()))]
+                                   : 'card-default';
+                
+                const textColor = colorClass.includes('no-response') ? 'text-white' : 'text-gray-900';
+                const subTextColor = colorClass.includes('no-response') ? 'text-gray-200' : 'text-gray-600';
+
                 dashboardHtml += `
-                    <div data-status="${status}" class="filter-card dashboard-card p-4 rounded-lg border-2 ${colors} shadow-sm cursor-pointer hover:opacity-80">
-                        <div class="text-3xl font-bold ${colors.includes('text-white') ? 'text-white' : 'text-gray-900'}">${count}</div>
-                        <div class="text-sm font-medium ${colors.includes('text-white') ? 'text-gray-200' : 'text-gray-600'}">${status}</div>
+                    <div data-status="${status}" class="filter-card dashboard-card p-5 ${colorClass} shadow-sm cursor-pointer hover:opacity-80">
+                        <div class="text-4xl font-bold ${textColor}">${count}</div>
+                        <div class="text-sm font-medium ${subTextColor} mt-1">${status}</div>
                     </div>
                 `;
             }
@@ -463,47 +521,76 @@
                     </span>`;
         }
 
-        // --- Editing Logic (Simplified) ---
+        // --- Editing Logic (NEW: Full Row Edit) ---
 
         function handleEditClick(event) {
             const rowIndex = event.target.closest('tr').getAttribute('data-row-index');
             
-            // Immediately show modal
             const itemData = allOrdersData[rowIndex];
             if (!itemData) return;
             
             const rowData = itemData.rowData;
-            modalCustomer.textContent = rowData[CUSTOMER_COLUMN_INDEX] || 'N/A';
-            modalPhone.textContent = rowData[PHONE_COLUMN_INDEX] || 'N/A';
-            modalAddress.textContent = rowData[ADDRESS_COLUMN_INDEX] || 'N/A';
-            modalProduct.textContent = rowData[PRODUCT_COLUMN_INDEX] || 'N/A';
-            modalStatusSelect.value = rowData[STATUS_COLUMN_INDEX] || 'Pending';
-            modalRowIndex.value = rowIndex; // Store the original row index from the data array
+            
+            // Populate key fields
+            document.getElementById('modal-col-D').value = rowData[CUSTOMER_COL];
+            document.getElementById('modal-col-E').value = rowData[PHONE_COL];
+            document.getElementById('modal-col-C').value = rowData[PRODUCT_COL];
+            document.getElementById('modal-col-F').value = rowData[ADDRESS_COL];
+            document.getElementById('modal-col-B').value = rowData[PRICE_COL];
+            document.getElementById('modal-col-H').value = rowData[QUANTITY_COL];
+            document.getElementById('modal-col-N').value = rowData[STATUS_COL];
+            
+            // Populate "Other Fields"
+            let otherFieldsHtml = '';
+            const keyFieldIndices = [CUSTOMER_COL, PHONE_COL, PRODUCT_COL, ADDRESS_COL, PRICE_COL, QUANTITY_COL, STATUS_COL];
+            
+            for(let i = 0; i < TOTAL_COLUMNS; i++) {
+                if (keyFieldIndices.includes(i)) continue; // Skip fields already shown
+                
+                otherFieldsHtml += `
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">${COLUMN_NAMES[i]}</label>
+                        <input type="text" id="modal-col-${i}" class="mt-1 p-2 w-full border border-gray-300 rounded-md shadow-sm" value="${rowData[i]}">
+                    </div>
+                `;
+            }
+            modalOtherFields.innerHTML = otherFieldsHtml;
 
+            // Store the original row index from the data array
+            modalRowIndex.value = rowIndex; 
             showModal(true);
         }
         
-        // Release lock (REMOVED)
         
         // Handle modal close (save or cancel)
         function handleModalClose(isSaving = false) {
             showModal(false);
-            // releaseLock(rowIndex); // REMOVED
             
             if (isSaving) {
                 loadData(); // Reload all data to show changes
             }
         }
 
-        async function handleSaveStatus() {
+        // NEW: Save all changes in the modal
+        async function handleSaveChanges() {
             showLoader(true);
             const originalDataRowIndex = parseInt(modalRowIndex.value);
             // The sheet is 1-indexed, and we have a header row (A2), so add 2
             const sheetRowNumber = originalDataRowIndex + 2; 
-            const newStatus = modalStatusSelect.value;
             
-            // 'N' is the 14th letter.
-            const updateRange = `Gadgets!N${sheetRowNumber}`; 
+            // Re-construct the full row array from all 18 modal inputs
+            let updatedRowData = [];
+            for(let i = 0; i < TOTAL_COLUMNS; i++) {
+                const inputElement = document.getElementById(`modal-col-${i}`) || document.getElementById(`modal-col-${String.fromCharCode(65 + i)}`); // Find 'modal-col-A', 'modal-col-0', etc.
+                if (inputElement) {
+                    updatedRowData.push(inputElement.value);
+                } else {
+                    // Fallback for any missing inputs (should not happen, but safe)
+                    updatedRowData.push(allOrdersData[originalDataRowIndex].rowData[i]);
+                }
+            }
+
+            const updateRange = `Gadgets!A${sheetRowNumber}:R${sheetRowNumber}`; 
 
             try {
                 await gapi.client.sheets.spreadsheets.values.update({
@@ -511,11 +598,11 @@
                     range: updateRange,
                     valueInputOption: 'RAW',
                     resource: {
-                        values: [[newStatus]]
+                        values: [updatedRowData] // Send the entire row as an array within an array
                     },
                 });
                 
-                // Success! Close modal (will release lock) and refresh data
+                // Success! Close modal and refresh data
                 handleModalClose(true); // Pass true to signal refresh
                 
             } catch (err) {
@@ -567,11 +654,10 @@
         showAllButton.addEventListener('click', handleShowAll);
         closeModalButton.addEventListener('click', () => handleModalClose(false));
         cancelEditButton.addEventListener('click', () => handleModalClose(false));
-        saveStatusButton.addEventListener('click', handleSaveStatus);
+        saveChangesButton.addEventListener('click', handleSaveChanges); // Updated listener
         closeErrorButton.addEventListener('click', hideError);
 
         // --- Start App ---
-        // initFirebase(); // REMOVED
         // Google API scripts will call their respective `...Loaded` functions when ready
 
     </script>
